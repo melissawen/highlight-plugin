@@ -17,19 +17,18 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
    def __init__(self):
       GObject.Object.__init__(self)
       self._colordialog = None
-      self.view = None
       self._start, self._end = 0,0
       self._counter = 0
-      self._color = None
       self._handler_id = None
       self._color_dict = dict()
    
    def do_activate(self):
       self._insert_toolbar_icon()
-      self._insert_sidebar() 
-
+      self._insert_sidebar()
+ 
    def do_deactivate(self):
       self._remove_toolbar_icon()
+      self._remove_sidebar()
 
    def _insert_toolbar_icon(self):
       vbox = self.window.get_children()[0]
@@ -45,7 +44,6 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       toolbar = vbox.get_children()[1]
       self._button.hide()
       toolbar.remove(self._button)
-      self._remove_sidebar()     
  
    #Begin of side panel options setup
    def _insert_sidebar(self):
@@ -88,8 +86,9 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       panel.remove_item(self.frame)
     
    def show_hide_all(self, togglebutton):
-      if self.view:
-         text = self.view.get_buffer()
+      view = self.window.get_active_view()
+      if view:
+         text = view.get_buffer()
          tag_table = text.get_tag_table()
          if togglebutton.get_active():
             tag_table.foreach(self.show_all_colors, None)
@@ -110,8 +109,9 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
             tag.set_property('background','#ffffff')
 
    def show_hide_this_color(self, togglebutton):
-      if self.view:
-         text = self.view.get_buffer()
+      view = self.window.get_active_view()
+      if view:
+         text = view.get_buffer()
          tag_table = text.get_tag_table()
          if togglebutton.get_active():
             tag_table.foreach(self.show_this_color, togglebutton.get_label())
@@ -145,8 +145,8 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
          self.stop_highlight()
 
    def stop_highlight(self):
-      self.view = self.window.get_active_view()
-      text = self.view.get_buffer()
+      view = self.window.get_active_view()
+      text = view.get_buffer()
       text.disconnect(self._handler_id)
       self._handler_id = None
 
@@ -154,28 +154,28 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
         if response == Gtk.ResponseType.OK:
            rgba = Gdk.RGBA()
            dialog.get_rgba(rgba)
-           self._color = '#'+("%02x%02x%02x" % (self.scale_color_component(rgba.red), \
+           color = '#'+("%02x%02x%02x" % (self.scale_color_component(rgba.red), \
                                                 self.scale_color_component(rgba.green), \
                                                 self.scale_color_component(rgba.blue)))
-           self.use_highlighter()
+           self.use_highlighter(color)
         self._colordialog.destroy()
         self._colordialog = None
 
    def scale_color_component(self, component):
         return min(max(int(round(component * 255.)), 0), 255)
 
-   def use_highlighter(self):
-      self.view = self.window.get_active_view()
-      if not self.view or not self.view.get_editable():
+   def use_highlighter(self, color):
+      view = self.window.get_active_view()
+      if not view or not view.get_editable():
          return
 
-      text = self.view.get_buffer()
+      text = view.get_buffer()
 
       if not text:
           return
-      self._handler_id = text.connect('mark-set', self.on_textbuffer_markset_event)
+      self._handler_id = text.connect('mark-set', self.on_textbuffer_markset_event, color)
 
-   def on_textbuffer_markset_event(self, textbuffer, iter, textmark):
+   def on_textbuffer_markset_event(self, textbuffer, iter, textmark, color):
       if textmark.get_name() != 'selection_bound' and textmark.get_name() != 'insert':
          return
 
@@ -191,23 +191,24 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
             if self.has_highlighted_tag(textbuffer, list_tag):
                return               
          
-         self.sum_n_to_color_dict()
+         self.sum_n_to_color_dict(color)
 
-         tag_name = self._color+'-'+str(self._counter)
+         tag_name = color+'-'+str(self._counter)
          if not textbuffer.get_tag_table().lookup(tag_name):
-            tag = textbuffer.create_tag(tag_name, background= self._color)
+            tag = textbuffer.create_tag(tag_name, background= color)
             textbuffer.apply_tag_by_name(tag_name, self._start, self._end)
             self._counter = self._counter+1
             self._start, self._end = 0,0
    
-   def sum_n_to_color_dict(self):
-         if self._color in self._color_dict:
-            self._color_dict[self._color] = self._color_dict[self._color] + 1
-         else:
-            self._color_dict[self._color] = 1
-            self.create_color_check_button(self._color)
+   def sum_n_to_color_dict(self, color):
+      if color in self._color_dict:
+         self._color_dict[color] = self._color_dict[color] + 1
+      else:
+         self._color_dict[color] = 1
+         self.create_color_check_button(color)
 
    def sub_n_to_color_dict(self, color):
+      if self._color_dict[color]:
          if self._color_dict[color] == 1:
             del self._color_dict[color]
             self.find_button(color)
