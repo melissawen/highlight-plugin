@@ -22,7 +22,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self._counter = 0
       self._color = None
       self._handler_id = None
-      self._color_set = set()
+      self._color_dict = dict()
    
    def do_activate(self):
       self._insert_toolbar_icon()
@@ -75,6 +75,13 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       button.connect("toggled", self.show_hide_this_color)
       self.bbox.add(button)
       button.show()
+   
+   def find_button(self, color):
+      self.bbox.foreach(self.remove_color_check_button, color)
+      
+   def remove_color_check_button(self, child, color):
+      if child.get_label() == color:
+         self.bbox.remove(child)
 
    def _remove_sidebar(self):
       panel = self.window.get_side_panel()
@@ -184,9 +191,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
             if self.has_highlighted_tag(textbuffer, list_tag):
                return               
          
-         if self._color not in self._color_set:
-            self._color_set.add(self._color)
-            self.create_color_check_button(self._color)
+         self.sum_n_to_color_dict()
 
          tag_name = self._color+'-'+str(self._counter)
          if not textbuffer.get_tag_table().lookup(tag_name):
@@ -194,6 +199,20 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
             textbuffer.apply_tag_by_name(tag_name, self._start, self._end)
             self._counter = self._counter+1
             self._start, self._end = 0,0
+   
+   def sum_n_to_color_dict(self):
+         if self._color in self._color_dict:
+            self._color_dict[self._color] = self._color_dict[self._color] + 1
+         else:
+            self._color_dict[self._color] = 1
+            self.create_color_check_button(self._color)
+
+   def sub_n_to_color_dict(self, color):
+         if self._color_dict[color] == 1:
+            del self._color_dict[color]
+            self.find_button(color)
+         else:
+            self._color_dict[color] = self._color_dict[color] - 1
 
    def has_highlighted_tag(self, textbuffer, list_tag):
       i=0
@@ -209,5 +228,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       tag_table = textbuffer.get_tag_table()
       tag = tag_table.lookup(list_tag[it_tag*(-1)].get_property('name'))
       tag_table.remove(tag)
+      self.sub_n_to_color_dict(tag.get_property('name').split('-')[0])
+      
   
    #End of highlight actions 
