@@ -1,0 +1,11 @@
+[Plugin]
+Loader=python
+Module=highlighter-dev
+IAge=3
+Name=Highlighters
+Name[pt_BR]=Marca Texto
+Description=Highlight important parts of your text
+Description[pt_BR]=Marque partes importantes do seu texto
+Authors=Melissa Shihfan Ribeiro Wen <melissa.srw@gmail.com>
+Copyright=Copyright © 2011 Melissa Shihfan Ribeiro Wen <melissa.srw@gmail.com>
+Version=3.4.2
