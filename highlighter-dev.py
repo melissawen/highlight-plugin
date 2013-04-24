@@ -20,6 +20,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self._start, self._end = 0,0
       self._counter = 0
       self._handler_id = None
+      self.view = None
       self._color_dict = dict()
    
    def do_activate(self):
@@ -27,6 +28,8 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self._insert_sidebar()
  
    def do_deactivate(self):
+      self.remove_all_highlights()
+      self.stop_highlight()
       self._remove_toolbar_icon()
       self._remove_sidebar()
 
@@ -86,9 +89,9 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       panel.remove_item(self.frame)
     
    def show_hide_all(self, togglebutton):
-      view = self.window.get_active_view()
-      if view:
-         text = view.get_buffer()
+      views = self.window.get_views()
+      for v in views:
+         text = v.get_buffer()
          tag_table = text.get_tag_table()
          if togglebutton.get_active():
             tag_table.foreach(self.show_all_colors, None)
@@ -109,9 +112,9 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
             tag.set_property('background','#ffffff')
 
    def show_hide_this_color(self, togglebutton):
-      view = self.window.get_active_view()
-      if view:
-         text = view.get_buffer()
+      views = self.window.get_views()
+      for v in views:
+         text = v.get_buffer()
          tag_table = text.get_tag_table()
          if togglebutton.get_active():
             tag_table.foreach(self.show_this_color, togglebutton.get_label())
@@ -136,7 +139,8 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
 
    #Begin of highlight actions  
    def on_highlighter_activate(self, toolbutton):
-      if not self._handler_id:
+      if toolbutton.get_active():
+         self.view = self.window.get_active_view()
          if not self._colordialog:
             self._colordialog = Gtk.ColorChooserDialog(_("Pick Color"), self.window)
             self._colordialog.connect_after('response', self.on_colordialog_response)
@@ -145,10 +149,11 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
          self.stop_highlight()
 
    def stop_highlight(self):
-      view = self.window.get_active_view()
-      text = view.get_buffer()
-      text.disconnect(self._handler_id)
-      self._handler_id = None
+      text = self.view.get_buffer()
+      if self._handler_id:
+         text.disconnect(self._handler_id)
+         self._handler_id = None
+         self.view = None
 
    def on_colordialog_response(self, dialog, response):
         if response == Gtk.ResponseType.OK:
@@ -165,11 +170,11 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
         return min(max(int(round(component * 255.)), 0), 255)
 
    def use_highlighter(self, color):
-      view = self.window.get_active_view()
-      if not view or not view.get_editable():
+
+      if not self.view or not self.view.get_editable():
          return
 
-      text = view.get_buffer()
+      text = self.view.get_buffer()
 
       if not text:
           return
@@ -230,6 +235,18 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       tag = tag_table.lookup(list_tag[it_tag*(-1)].get_property('name'))
       tag_table.remove(tag)
       self.sub_n_to_color_dict(tag.get_property('name').split('-')[0])
-      
-  
+
+   def remove_all_highlights(self):
+      views = self.window.get_views()
+      for v in views:
+         text = v.get_buffer()
+         if text:
+            tag_table = text.get_tag_table()
+            for color in self._color_dict:
+               while self._color_dict[color] > 0:
+                  tag = tag_table.lookup(color+'-'+str(self._color_dict[color]-1))
+                  if tag:
+                     tag_table.remove(tag)
+                  self._color_dict[color] = self._color_dict[color] - 1
+            self._color_dict = dict()
    #End of highlight actions 
