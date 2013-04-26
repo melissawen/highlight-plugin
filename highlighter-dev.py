@@ -140,7 +140,6 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
    #Begin of highlight actions  
    def on_highlighter_activate(self, toolbutton):
       if toolbutton.get_active():
-         self.view = self.window.get_active_view()
          if not self._colordialog:
             self._colordialog = Gtk.ColorChooserDialog(_("Pick Color"), self.window)
             self._colordialog.connect_after('response', self.on_colordialog_response)
@@ -149,11 +148,12 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
          self.stop_highlight()
 
    def stop_highlight(self):
-      text = self.view.get_buffer()
-      if self._handler_id:
-         text.disconnect(self._handler_id)
-         self._handler_id = None
-         self.view = None
+      if self.view:
+         text = self.view.get_buffer()
+         if self._handler_id:
+            text.disconnect(self._handler_id)
+            self._handler_id = None
+            self.view = None
 
    def on_colordialog_response(self, dialog, response):
         if response == Gtk.ResponseType.OK:
@@ -170,7 +170,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
         return min(max(int(round(component * 255.)), 0), 255)
 
    def use_highlighter(self, color):
-
+      self.view = self.window.get_active_view()
       if not self.view or not self.view.get_editable():
          return
 
@@ -240,13 +240,14 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       views = self.window.get_views()
       for v in views:
          text = v.get_buffer()
-         if text:
-            tag_table = text.get_tag_table()
-            for color in self._color_dict:
-               while self._color_dict[color] > 0:
-                  tag = tag_table.lookup(color+'-'+str(self._color_dict[color]-1))
-                  if tag:
-                     tag_table.remove(tag)
-                  self._color_dict[color] = self._color_dict[color] - 1
-            self._color_dict = dict()
+         tag_table = text.get_tag_table()
+         for color in self._color_dict:
+            i = self._counter
+            while i > 0:
+               tag = tag_table.lookup(color+'-'+str(i-1))
+               i=i-1
+               if tag:
+                  tag_table.remove(tag)
+                  print "bla-"+color+"-"+str(i)
+      self._color_dict = dict()
    #End of highlight actions 
