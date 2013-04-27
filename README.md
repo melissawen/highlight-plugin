@@ -1,13 +1,16 @@
-=Highlighter Plugin for Gedit=
+Highlighter Plugin for Gedit
+============================
 
 This plugin creates visual markups in files that are editing by Gedit. This seems like when we use a highlighter in our notepad to highlight parts of text that need extra attention or to be remind later.
 It is being developed using python. 
 
-=INSTALL
+INSTALL
+=======
 
 You can make this plugin available in your Gedit copying files highlighter.plugin and highlighter.py to .local/share/gedit/plugins in your home directory or directly in Gedit plugin's directory.
 
-=HOW TO USE
+HOW TO USE
+==========
 
 On Gedit, preferences > plugins, check the button of Highlighter plugin to turn it on.
 
@@ -19,7 +22,8 @@ You can setup visualization options of markups - show/hide one or more colors. T
 
 When you turn off the plugin , all markups are removed.
 
-=TO DO
+TO DO
+=====
 
 Finish to code the side panel options
 - Colors of buttons background
