@@ -1,6 +1,6 @@
 [Plugin]
 Loader=python
-Module=highlighter-dev
+Module=highlighter
 IAge=3
 Name=Highlighters
 Name[pt_BR]=Marca Texto

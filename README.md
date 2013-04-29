@@ -25,9 +25,6 @@ When you turn off the plugin , all markups are removed.
 TO DO
 =====
 
-Finish to code the side panel options
-- Colors of buttons background
-
 Save tags in a file to load them next time.
 - Open a dialog to ask if user want to load old tags
 - Update file with new tags

@@ -32,15 +32,14 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self._handler_id = None
       self.view = None
       self._color_dict = dict()
-      #self.file = None
    
    def do_activate(self):
       self._insert_toolbar_icon()
       self._insert_sidebar()
  
    def do_deactivate(self):
-      self.remove_all_highlights(None)
-      self.stop_highlight()
+      self.remove_all_markups(None)
+      self.stop_highlighting()
       self._remove_toolbar_icon()
       self._remove_sidebar()
 
@@ -63,15 +62,15 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
    def _insert_sidebar(self):
       panel = self.window.get_side_panel()
       icon = Gtk.Image.new_from_stock(Gtk.STOCK_SELECT_COLOR, Gtk.IconSize.MENU)
-      self.frame = Gtk.Frame(label="Show/Hide Highlight")
+      self.frame = Gtk.Frame(label="Show/Hide Markups")
       self.frame.set_border_width(5)
 
       self.bbox = Gtk.VButtonBox()
       self.frame.add(self.bbox)
       self.bbox.set_layout(Gtk.ButtonBoxStyle.START)
       
-      button = Gtk.Button('Remove all highlights')
-      button.connect('clicked', self.remove_all_highlights)
+      button = Gtk.Button('Remove all markups')
+      button.connect('clicked', self.remove_all_markups)
       self.bbox.add(button)
       button.show()      
  
@@ -83,7 +82,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self.bbox.show()
       self.frame.show()
       
-      panel.add_item(self.frame, 'Show Highlight', 'Highlighter', icon)
+      panel.add_item(self.frame, 'Show markups', 'Highlighter', icon)
       panel.activate_item(self.frame)
    
    def create_color_check_button(self,color):
@@ -155,7 +154,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
 
    #End of side panel options setup
 
-   #Begin of highlight actions 
+   #beginning of highlighter actions 
    def on_highlighter_activate(self, toolbutton):
       if toolbutton.get_active():
          if not self._colordialog:
@@ -163,17 +162,15 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
             self._colordialog.connect_after('response', self.on_colordialog_response)
          self._colordialog.present()
       else:
-         self.stop_highlight()
+         self.stop_highlighting()
 
-   def stop_highlight(self):
+   def stop_highlighting(self):
       if self.view:
          text = self.view.get_buffer()
          if self._handler_id:
             text.disconnect(self._handler_id)
             self._handler_id = None
             self.view = None
-      '''if self.file:
-         self.file.close()'''
 
    def on_colordialog_response(self, dialog, response):
         if response == Gtk.ResponseType.OK:
@@ -195,9 +192,6 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
          return
 
       text = self.view.get_buffer()
-      '''fname = text.get_property('shortname')
-      fname = fname +'.mkf'
-      self.file = open(fname, 'a')'''
       if not text:
           return
       self._handler_id = text.connect('mark-set', self.on_textbuffer_markset_event, color)
@@ -223,16 +217,9 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
          tag_name = color+'-'+str(self._counter)
          if not textbuffer.get_tag_table().lookup(tag_name):
             tag = textbuffer.create_tag(tag_name, background= color)
-            #self.save_tag_in_file(tag_name)
             textbuffer.apply_tag_by_name(tag_name, self._start, self._end)
             self._counter = self._counter+1
-            self._start, self._end = None,None
-
-   '''def save_tag_in_file(self, tag_name):
-      tag_info = str(self._start.get_line()) + ':'+ str(self._start.get_offset()) + '_' 
-      tag_info = tag_info + str(self._end.get_line()) + ':'+ str(self._end.get_offset()) + '_'
-      tag_info = tag_info + tag_name + '\n'
-      self.file.write(tag_info) '''     
+            self._start, self._end = None,None   
    
    def sum_n_to_color_dict(self, color):
       if color in self._color_dict:
@@ -255,17 +242,17 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       while (n_tags > i and list_tag[i*(-1)].get_property('name') == None):
          i = i+1
       if n_tags > i:
-         self.remove_highlight(textbuffer, list_tag, i)
+         self.remove_markup(textbuffer, list_tag, i)
          return True
       return False
 
-   def remove_highlight(self, textbuffer, list_tag, it_tag):
+   def remove_markup(self, textbuffer, list_tag, it_tag):
       tag_table = textbuffer.get_tag_table()
       tag = tag_table.lookup(list_tag[it_tag*(-1)].get_property('name'))
       tag_table.remove(tag)
       self.sub_n_to_color_dict(tag.get_property('name').split('-')[0])
 
-   def remove_all_highlights(self, button):
+   def remove_all_markups(self, button):
       views = self.window.get_views()
       for v in views:
          text = v.get_buffer()
@@ -280,4 +267,4 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       for color in self._color_dict:
          self.find_button(color)
       self._color_dict = dict()
-   #End of highlight actions 
+   #end of highlighter actions
