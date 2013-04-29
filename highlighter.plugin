@@ -2,9 +2,9 @@
 Loader=python
 Module=highlighter
 IAge=3
-Name=Highlighters
+Name=Highlighter
 Name[pt_BR]=Marca Texto
-Description=Highlight important parts of your text
+Description=Mark important parts of your text
 Description[pt_BR]=Marque partes importantes do seu texto
 Authors=Melissa Shihfan Ribeiro Wen <melissa.srw@gmail.com>
 Copyright=Copyright © 2011 Melissa Shihfan Ribeiro Wen <melissa.srw@gmail.com>
