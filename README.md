@@ -13,11 +13,19 @@ HOW TO USE
 
 On Gedit, preferences > plugins, check the button of Highlighter plugin to turn it on.
 
+![activate](https://github.com/melissawen/highlight-plugin/blob/master/img/pluginactivate.png "Activate highlighter")
+
 A "select color" icon will appear on your toolbar. Click on this icon, select a color to be used and so, select part of text that you wanna highlight. The highlighter works only inside the view that was activated when highlighter icon was clicked.
+
+![color dialog](https://github.com/melissawen/highlight-plugin/blob/master/img/colordialog.png "Pick color")
 
 You can remove a markup selecting the text (or part of this) that was marked by highlighter or clicking on "Remove all markups" button on side panel.
 
+![highlighter side panel](https://github.com/melissawen/highlight-plugin/blob/master/img/highlightersidepanel.png "Side panel options")
+
 You can setup visualization options of markups - show/hide one or more colors. To do it, activate side panel of gedit, click on highlighter tab (identified by "select color" icon) and mark or unmark the check button related to color.
+
+![hide color option](https://github.com/melissawen/highlight-plugin/blob/master/img/hidecoloroption.png "Show or Hide a color")
 
 When you turn off the plugin , all markups will be removed.
 
