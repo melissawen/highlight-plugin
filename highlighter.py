@@ -18,6 +18,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 '''
 
 from gi.repository import GObject, Gtk, GtkSource, Gedit, Gdk
+from os import path
+import os
 
 class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
    __gtype_name__ = "HighlighterPlugin"
@@ -36,6 +38,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
    def do_activate(self):
       self._insert_toolbar_icon()
       self._insert_sidebar()
+      self._activate_save_tag_to_file()   
  
    def do_deactivate(self):
       self.remove_all_markups(None)
@@ -58,7 +61,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self._button.hide()
       toolbar.remove(self._button)
  
-   #Begin of side panel options setup
+   #Begin to set side panel options
    def _insert_sidebar(self):
       panel = self.window.get_side_panel()
       icon = Gtk.Image.new_from_stock(Gtk.STOCK_SELECT_COLOR, Gtk.IconSize.MENU)
@@ -152,9 +155,9 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
          if tag_color == color :
             tag.set_property('background','#ffffff')
 
-   #End of side panel options setup
+   #End to set side panel options
 
-   #beginning of highlighter actions 
+   #Begin to define highlighter actions 
    def on_highlighter_activate(self, toolbutton):
       if toolbutton.get_active():
          if not self._colordialog:
@@ -173,21 +176,22 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
             self.view = None
 
    def on_colordialog_response(self, dialog, response):
-        if response == Gtk.ResponseType.OK:
-           rgba = Gdk.RGBA()
-           dialog.get_rgba(rgba)
-           color = '#'+("%02x%02x%02x" % (self.scale_color_component(rgba.red), \
-                                                self.scale_color_component(rgba.green), \
-                                                self.scale_color_component(rgba.blue)))
-           self.use_highlighter(color)
-        self._colordialog.destroy()
-        self._colordialog = None
-
+      if response == Gtk.ResponseType.OK:
+         rgba = Gdk.RGBA()
+         dialog.get_rgba(rgba)
+         color = '#'+("%02x%02x%02x" % (self.scale_color_component(rgba.red), \
+                                              self.scale_color_component(rgba.green), \
+                                              self.scale_color_component(rgba.blue)))
+         self.use_highlighter(color)
+      self._colordialog.destroy()
+      self._colordialog = None
+      
    def scale_color_component(self, component):
-        return min(max(int(round(component * 255.)), 0), 255)
+      return min(max(int(round(component * 255.)), 0), 255)
 
    def use_highlighter(self, color):
-      self.view = self.window.get_active_view()
+      tab = self.window.get_active_tab()
+      self.view = tab.get_view()
       if not self.view or not self.view.get_editable():
          return
 
@@ -211,15 +215,18 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
          if list_tag:
             if self.has_highlighted_tag(textbuffer, list_tag):
                return               
+         tag_name = self.add_tag(color, textbuffer)
+         self.add_tag_to_file(tag_name)
+         self._counter = self._counter+1
+         self._start, self._end = None,None
          
-         self.sum_n_to_color_dict(color)
-
-         tag_name = color+'-'+str(self._counter)
-         if not textbuffer.get_tag_table().lookup(tag_name):
-            tag = textbuffer.create_tag(tag_name, background= color)
-            textbuffer.apply_tag_by_name(tag_name, self._start, self._end)
-            self._counter = self._counter+1
-            self._start, self._end = None,None   
+   def add_tag(self, color, textbuffer):
+      self.sum_n_to_color_dict(color)
+      tag_name = color+'-'+str(self._counter)
+      if not textbuffer.get_tag_table().lookup(tag_name):
+         tag = textbuffer.create_tag(tag_name, background= color)
+         textbuffer.apply_tag_by_name(tag_name, self._start, self._end)
+      return tag_name
    
    def sum_n_to_color_dict(self, color):
       if color in self._color_dict:
@@ -250,6 +257,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       tag_table = textbuffer.get_tag_table()
       tag = tag_table.lookup(list_tag[it_tag*(-1)].get_property('name'))
       tag_table.remove(tag)
+      self.remove_tag_from_file(tag.get_property('name'))          
       self.sub_n_to_color_dict(tag.get_property('name').split('-')[0])
 
    def remove_all_markups(self, button):
@@ -267,4 +275,101 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       for color in self._color_dict:
          self.find_button(color)
       self._color_dict = dict()
-   #end of highlighter actions
+   #End
+   
+   def _activate_save_tag_to_file(self):
+      self.window.connect('tab-added', self.on_tab_added_event) 
+      
+   def _get_file_path(self, doc):
+      fname="."+doc.get_property('shortname')
+      lfile = doc.get_location()
+      directory = lfile.get_parent().get_path()
+      return str(directory+'/'+fname+'.mkf')   
+
+   def open_tags_file(self, mode):
+      tab = self.window.get_active_tab()
+      doc = tab.get_document()
+      if (doc.is_untitled()):
+         fname= tab.get_property('name')
+         directory = path.dirname(path.realpath(__file__))
+         self.file = open(directory+'/.tags-files/'+fname+'.mkf', mode)
+      else:
+         fpath = self._get_file_path(doc)
+         self.file = open(fpath, mode)
+     
+   def add_tag_to_file(self, tag_name):
+      self.open_tags_file('a+')
+      tag_info = str(self._start.get_offset()) + ' ' 
+      tag_info = tag_info + str(self._end.get_offset())
+      self.file.write(tag_name+' '+tag_info+'\n')
+      self.file.close()
+   
+   def remove_tag_from_file(self, tag_name):
+      self.open_tags_file('r')
+      lines = self.file.readlines()
+      self.file.close()
+      self.open_tags_file('w')
+      for line in lines:
+         aux = line.split(' ')
+         if (aux[0] != tag_name):
+            self.file.write(line)
+      self.file.close()
+   
+   def on_tab_added_event(self, win, tab):
+      doc = tab.get_document()
+      if doc:
+         doc.connect('loaded', self.on_load_doc_event, tab)
+
+     #check if exist tags file with the same name
+     #open a dialog asking to load tags
+     #remove tags's file if say no
+     #load tags if say yes
+    
+   def on_dialog_yes_no(self, tab):
+      dialog = Gtk.Dialog("Do you want to load markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
+      dialog.connect_after('response', self.on_dialog_response, tab)
+      dialog.present()
+      
+   def on_dialog_response(self, dialog, response, tab):
+      if response == Gtk.ResponseType.YES:
+         self.load_tags_from_file(tab)
+      elif response == Gtk.ResponseType.NO:
+         doc = tab.get_document()
+         fpath = self._get_file_path(doc)
+         os.remove(fpath)         
+      dialog.destroy()
+      
+   def on_load_doc_event(self, doc, error, tab):
+      fpath = self._get_file_path(doc)
+
+      try:
+         with open(fpath) as self.file:
+            self.on_dialog_yes_no(tab)
+      except IOError:
+         pass
+
+   def load_tags_from_file(self, tab):
+      doc = tab.get_document()
+      fpath = self._get_file_path(doc)
+      
+      self.file = open(fpath,'r')
+      
+      textbuffer = tab.get_view().get_buffer()
+      for line in self.file:
+         tag_info = line.split(' ')
+         color = tag_info[0].split('-')[0]
+         if textbuffer:
+            self._start = textbuffer.get_iter_at_offset(int(tag_info[1]))
+            self._end = textbuffer.get_iter_at_offset(int(tag_info[2]))
+            self._counter = int(tag_info[0].split('-')[1])
+            self.add_tag(color, textbuffer)
+            self._start, self._end = None,None
+      self._counter = self._counter+1
+      self.file.close()
+           
+   #def load_tags_files(self):
+     
+   #def on_save_file_event(self):
+     #open a dialog asking to save tags
+     #if yes, set name of file, close and open
+     #if no, delete file
