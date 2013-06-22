@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 from gi.repository import GObject, Gtk, GtkSource, Gedit, Gdk
 from os import path
 import os
+import shutil
 
 class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
    __gtype_name__ = "HighlighterPlugin"
@@ -194,10 +195,11 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self.view = tab.get_view()
       if not self.view or not self.view.get_editable():
          return
-
+         
       text = self.view.get_buffer()
       if not text:
           return
+          
       self._handler_id = text.connect('mark-set', self.on_textbuffer_markset_event, color)
 
    def on_textbuffer_markset_event(self, textbuffer, iter, textmark, color):
@@ -290,7 +292,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       tab = self.window.get_active_tab()
       doc = tab.get_document()
       if (doc.is_untitled()):
-         fname= tab.get_property('name')
+         fname= doc.get_property('shortname')
          directory = path.dirname(path.realpath(__file__))
          self.file = open(directory+'/.tags-files/'+fname+'.mkf', mode)
       else:
@@ -318,12 +320,8 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
    def on_tab_added_event(self, win, tab):
       doc = tab.get_document()
       if doc:
-         doc.connect('loaded', self.on_load_doc_event, tab)
-
-     #check if exist tags file with the same name
-     #open a dialog asking to load tags
-     #remove tags's file if say no
-     #load tags if say yes
+         doc.connect('loaded', self.on_load_file_event, tab)
+         doc.connect('save', self.on_save_file_event)
     
    def on_dialog_yes_no(self, tab):
       dialog = Gtk.Dialog("Do you want to load markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
@@ -339,14 +337,14 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
          os.remove(fpath)         
       dialog.destroy()
       
-   def on_load_doc_event(self, doc, error, tab):
-      fpath = self._get_file_path(doc)
-
-      try:
-         with open(fpath) as self.file:
-            self.on_dialog_yes_no(tab)
-      except IOError:
-         pass
+   def on_load_file_event(self, doc, error, tab):
+      if not error:
+         fpath = self._get_file_path(doc)
+         try:
+            with open(fpath) as self.file:
+               self.on_dialog_yes_no(tab)
+         except IOError:
+            pass
 
    def load_tags_from_file(self, tab):
       doc = tab.get_document()
@@ -366,10 +364,35 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
             self._start, self._end = None,None
       self._counter = self._counter+1
       self.file.close()
-           
-   #def load_tags_files(self):
-     
-   #def on_save_file_event(self):
-     #open a dialog asking to save tags
-     #if yes, set name of file, close and open
-     #if no, delete file
+   
+   def on_save_file_event(self, doc, loc, enc, flag, arg, arg2):
+      fpath = None
+      if (doc.is_untitled()):
+         fname= doc.get_property('shortname')
+         directory = path.dirname(path.realpath(__file__))
+         fpath = directory+'/.tags-files/'+fname+'.mkf'
+      doc.connect('saved', self.on_saved_file_event, fpath)         
+      
+   def on_saved_file_event(self, doc, error, src):
+     if not error:
+        dialog = Gtk.Dialog("Do you want to save markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
+        dialog.connect_after('response', self.on_save_tags_response, doc, src)
+        dialog.present()
+        
+   def on_save_tags_response(self, dialog, response, doc, src):
+      if response == Gtk.ResponseType.YES:
+         if src:
+            dst= self._get_file_path(doc)
+            shutil.move(src, dst)
+      elif response == Gtk.ResponseType.NO:
+         if src:
+            os.remove(src)
+         else:
+            fpath = self._get_file_path(doc)
+            try:
+               with open(fpath) as self.file:
+                  os.remove(fpath)
+            except IOError:
+               pass         
+      dialog.destroy()
+         
