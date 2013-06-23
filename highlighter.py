@@ -39,7 +39,8 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
    def do_activate(self):
       self._insert_toolbar_icon()
       self._insert_sidebar()
-      self._activate_save_tag_to_file()   
+      self._activate_save_tag_to_file()
+      self.ask_load_files() 
  
    def do_deactivate(self):
       self.remove_all_markups(None)
@@ -283,10 +284,12 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self.window.connect('tab-added', self.on_tab_added_event) 
       
    def _get_file_path(self, doc):
-      fname="."+doc.get_property('shortname')
-      lfile = doc.get_location()
-      directory = lfile.get_parent().get_path()
-      return str(directory+'/'+fname+'.mkf')   
+      if doc:
+         fname="."+doc.get_property('shortname')
+         lfile = doc.get_location()
+         directory = lfile.get_parent().get_path()
+         return str(directory+'/'+fname+'.mkf')
+      return None  
 
    def open_tags_file(self, mode):
       tab = self.window.get_active_tab()
@@ -318,21 +321,22 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self.file.close()
    
    def on_tab_added_event(self, win, tab):
+      self.window.connect('tab-removed', self.on_close_tab_event)
       doc = tab.get_document()
       if doc:
          doc.connect('loaded', self.on_load_file_event, tab)
-         doc.connect('save', self.on_save_file_event)
     
    def on_dialog_yes_no(self, tab):
       dialog = Gtk.Dialog("Do you want to load markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
+      dialog.set_default_size(250, 100)
       dialog.connect_after('response', self.on_dialog_response, tab)
       dialog.present()
       
    def on_dialog_response(self, dialog, response, tab):
+      doc = tab.get_document()
       if response == Gtk.ResponseType.YES:
          self.load_tags_from_file(tab)
       elif response == Gtk.ResponseType.NO:
-         doc = tab.get_document()
          fpath = self._get_file_path(doc)
          os.remove(fpath)         
       dialog.destroy()
@@ -365,34 +369,53 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self._counter = self._counter+1
       self.file.close()
    
-   def on_save_file_event(self, doc, loc, enc, flag, arg, arg2):
-      fpath = None
-      if (doc.is_untitled()):
-         fname= doc.get_property('shortname')
-         directory = path.dirname(path.realpath(__file__))
-         fpath = directory+'/.tags-files/'+fname+'.mkf'
-      doc.connect('saved', self.on_saved_file_event, fpath)         
-      
-   def on_saved_file_event(self, doc, error, src):
-     if not error:
-        dialog = Gtk.Dialog("Do you want to save markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
-        dialog.connect_after('response', self.on_save_tags_response, doc, src)
-        dialog.present()
+   def on_close_tab_event(self, win, tab):
+      doc = tab.get_document()
+      fpath = self._get_file_path(doc)
+      if not doc.is_untitled() or (tab.get_property('name')[0] == '*'):
+         self.save_to_file(doc)
+      else:
+         try:
+            with open(fpath) as self.file:
+               os.remove(fpath)
+         except IOError:
+            pass        
+
+   #asking to save to file
+   def save_to_file(self, doc):
+     fpath = self._get_file_path(doc)
+     try:
+        with open(fpath) as self.file:
+           dialog = Gtk.Dialog("Do you want to save markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
+           dialog.set_default_size(250, 100)
+           dialog.connect_after('response', self.on_save_tags_response, fpath)
+           dialog.present()
+     except IOError:
+        pass        
         
-   def on_save_tags_response(self, dialog, response, doc, src):
-      if response == Gtk.ResponseType.YES:
-         if src:
-            dst= self._get_file_path(doc)
-            shutil.move(src, dst)
-      elif response == Gtk.ResponseType.NO:
-         if src:
-            os.remove(src)
-         else:
-            fpath = self._get_file_path(doc)
-            try:
-               with open(fpath) as self.file:
-                  os.remove(fpath)
-            except IOError:
-               pass         
+   def on_save_tags_response(self, dialog, response, fpath):
+      if response == Gtk.ResponseType.NO:
+         os.remove(fpath)    
       dialog.destroy()
-         
+      
+   def on_load_all_files_response(self, dialog, response, docs):
+      for doc in docs:
+         fpath = self._get_file_path(doc)
+         try:
+            with open(fpath) as self.file:
+               if response == Gtk.ResponseType.YES:
+                  tab = self.window.get_tab_from_location(doc.get_location())
+                  if tab:
+                     self.load_tags_from_file(tab)
+               elif response == Gtk.ResponseType.NO:
+                  os.remove(fpath)
+         except IOError:
+            pass                 
+      dialog.destroy()
+
+   def ask_load_files(self):
+      docs = self.window.get_documents()
+      dialog = Gtk.Dialog("If have some markups files, do you want to load them?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
+      dialog.set_default_size(250, 100)
+      dialog.connect_after('response', self.on_load_all_files_response, docs)
+      dialog.present()
