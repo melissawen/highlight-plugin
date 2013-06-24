@@ -35,6 +35,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self._handler_id = None
       self.view = None
       self._color_dict = dict()
+      self._mkf_list = set()
    
    def do_activate(self):
       self._insert_toolbar_icon()
@@ -45,6 +46,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
    def do_deactivate(self):
       self.remove_all_markups(None)
       self.stop_highlighting()
+      self.del_all_unsaved_markups()
       self._remove_toolbar_icon()
       self._remove_sidebar()
 
@@ -67,9 +69,8 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
    def _insert_sidebar(self):
       panel = self.window.get_side_panel()
       icon = Gtk.Image.new_from_stock(Gtk.STOCK_SELECT_COLOR, Gtk.IconSize.MENU)
-      self.frame = Gtk.Frame(label="Show/Hide Markups")
+      self.frame = Gtk.Frame(label="Options")
       self.frame.set_border_width(5)
-
       self.bbox = Gtk.VButtonBox()
       self.frame.add(self.bbox)
       self.bbox.set_layout(Gtk.ButtonBoxStyle.START)
@@ -77,9 +78,14 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       button = Gtk.Button('Remove all markups')
       button.connect('clicked', self.remove_all_markups)
       self.bbox.add(button)
-      button.show()      
+      button.show()  
+      
+      button = Gtk.Button('Save markups to file')
+      button.connect('clicked', self.save_markups)
+      self.bbox.add(button)
+      button.show()
  
-      button = Gtk.CheckButton('Show/Hide All')
+      button = Gtk.CheckButton('Show/Hide all markups')
       button.set_active(True)
       button.connect("toggled", self.show_hide_all)
       self.bbox.add(button)
@@ -278,6 +284,17 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       for color in self._color_dict:
          self.find_button(color)
       self._color_dict = dict()
+      if button:
+         docs = self.window.get_documents()
+         for doc in docs:
+            fpath = self._get_file_path(doc)
+            try:
+               with open(fpath) as self.file:
+                  os.remove(fpath)
+            except IOError:
+               pass     
+         
+      
    #End
    
    def _activate_save_tag_to_file(self):
@@ -327,8 +344,8 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
          doc.connect('loaded', self.on_load_file_event, tab)
     
    def on_dialog_yes_no(self, tab):
-      dialog = Gtk.Dialog("Do you want to load markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
-      dialog.set_default_size(250, 100)
+      dialog = Gtk.Dialog("Load markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
+      dialog.set_default_size(150, 50)
       dialog.connect_after('response', self.on_dialog_response, tab)
       dialog.present()
       
@@ -369,34 +386,29 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
       self._counter = self._counter+1
       self.file.close()
    
-   def on_close_tab_event(self, win, tab):
-      doc = tab.get_document()
+   def save_markups(self, button):
+      doc = self.window.get_active_document()
       fpath = self._get_file_path(doc)
-      if not doc.is_untitled() or (tab.get_property('name')[0] == '*'):
-         self.save_to_file(doc)
-      else:
+      if fpath:
+         self._mkf_list.add(fpath)
+   
+   def del_unsaved_markups(self, doc):
+      fpath = self._get_file_path(doc)
+      if doc.is_untitled() or not (fpath in self._mkf_list):
          try:
             with open(fpath) as self.file:
                os.remove(fpath)
          except IOError:
-            pass        
-
-   #asking to save to file
-   def save_to_file(self, doc):
-     fpath = self._get_file_path(doc)
-     try:
-        with open(fpath) as self.file:
-           dialog = Gtk.Dialog("Do you want to save markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
-           dialog.set_default_size(250, 100)
-           dialog.connect_after('response', self.on_save_tags_response, fpath)
-           dialog.present()
-     except IOError:
-        pass        
-        
-   def on_save_tags_response(self, dialog, response, fpath):
-      if response == Gtk.ResponseType.NO:
-         os.remove(fpath)    
-      dialog.destroy()
+            pass
+   
+   def del_all_unsaved_markups(self):
+      docs = self.window.get_documents()
+      for doc in docs:
+         self.del_unsaved_markups(doc) 
+   
+   def on_close_tab_event(self, win, tab):
+      doc = tab.get_document()
+      self.del_unsaved_markups(doc)     
       
    def on_load_all_files_response(self, dialog, response, docs):
       for doc in docs:
@@ -415,7 +427,7 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
 
    def ask_load_files(self):
       docs = self.window.get_documents()
-      dialog = Gtk.Dialog("If have some markups files, do you want to load them?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
-      dialog.set_default_size(250, 100)
+      dialog = Gtk.Dialog("Load Markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
+      dialog.set_default_size(150, 50)
       dialog.connect_after('response', self.on_load_all_files_response, docs)
       dialog.present()
