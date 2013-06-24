@@ -427,7 +427,9 @@ class HighlighterPlugin(GObject.Object, Gedit.WindowActivatable):
 
    def ask_load_files(self):
       docs = self.window.get_documents()
-      dialog = Gtk.Dialog("Load Markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
-      dialog.set_default_size(150, 50)
-      dialog.connect_after('response', self.on_load_all_files_response, docs)
-      dialog.present()
+      doc = self.window.get_active_document()
+      if doc:
+         dialog = Gtk.Dialog("Load Markups?", None, 0, (Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES))
+         dialog.set_default_size(150, 50)
+         dialog.connect_after('response', self.on_load_all_files_response, docs)
+         dialog.present()
