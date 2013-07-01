@@ -29,12 +29,13 @@ You can setup visualization options of markups - show/hide one or more colors. T
 
 When you turn off the plugin , all markups will be removed.
 
+Load/Store markups
+
+When you activate this plugin, you will be asked to load or not markups stored on file.
+If you say yes, markups of the last session will be displayed. If you say no, markups file will be deleted.
+If you want to store current markups on file, you need to press "save to file" button. If you don't do it before closing your document, markups will be discarted.
+
 TO DO
 =====
-
-Storing tags in file to load them next time.
-- Opening a dialog to ask if user want to load old tags
-- Updating file with new tags
-- Updating TagTable with informations stored in file
 
 When "Search" tool (Ctrl+F) is in use, plugin have to stop.
